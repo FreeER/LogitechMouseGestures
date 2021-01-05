@@ -22,6 +22,7 @@ handlers["center"] = function() PressAndReleaseKeyModified('tab','lalt') end    
 -- note: for whatever reason Press...Key doesn't seem to like 'ctrl', it wants 'lctrl' or presumably 'rctrl'
 
 handlers["alt_left"] = function() PressAndReleaseKeyModified('F4','lalt') end         -- alt-F4 close window
+handlers["alt_right"]  = function() PressAndReleaseKeyModified('delete','lctrl'); Sleep(50); gestureMinimise() end -- delete and minimize QuiteRSS
 --[[
 -- undefined alternates call the same as the non-gshifted versions
 handlers["alt_up"]     = function() PressAndReleaseKey("home") end
@@ -95,7 +96,7 @@ function control_menu(key)
   PressAndReleaseKeyModified('spacebar', 'lalt')
   Sleep(250)
   PressAndReleaseKey(key)
-  sleep(40)
+  Sleep(40)
 end
 
 -- window movements
