@@ -1,17 +1,18 @@
 # LogitechMouseGestures
-Lua script for basic mouse gestures for Windows 7, 8 and 10.
+Lua script for basic mouse gestures
 
 ## How to use:
-In your Logitech Gaming Software Panel right click the profile in which you want the script to be running (for instance Standard for your normal desktop environment). Got to "Create Script" and just paste or import the code from GitHub. You can enable the reset window function if you want to use a dedicated button for gestures or just leave it disabled so you can use a button that is in use. I recommend using a dedicated mouse button because the software seems to be treating reserved mouse buttons differently.
+In your Logitech Gaming Software Panel right click the profile in which you want the script to be running (for instance Standard for your normal desktop environment). Go to "Create Script" and just paste or import the code from GitHub. Mat recommends using a dedicated mouse button because the software seems to be treating reserved mouse buttons differently.
 
 ## Gestures:
-Name | Action  | Description | Default
----- | ------- | ----------- | -------
-Maximise | Alt+Space x | Maximises active window | enabled
-Minimise | Alt+Space n | Minimises active window | enabled
-Moveleft | WinKey+Left | Moves active window to the left | enabled
-Moveright | WinKey+Right | Moves active window to the right | enabled
-Reset | Alt+Space w | Resets the active window | disabled
+Name | Action  | Description
+---- | ------- | -----------
+Close Tab | Left | Closes the tab via ctrl+w
+Close window | gshift+Left | Closes the window via alt+F4
+Reopen Tab | Right | Reopens a tab via ctrl+shift+t
+Home | Up | presses home to go to the top of a page/list
+End | Down | presses End to go to the end of a page/list
+Alt+tab | Center | presses alt tab to tab between last window (ctrl+center will leave it open and use arrows + enter to select)
 
 ## Screenshots:
 ![Right clicking profile](http://i.imgur.com/zNqAKtB.png "Right click a profile")
