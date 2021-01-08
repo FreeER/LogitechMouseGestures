@@ -1,7 +1,7 @@
 --[[
 Author:    Mat/FreeER
-Version:   1.14
-Date:      Jan. 5th 2021
+Version:   1.15
+Date:      Jan. 8th 2021
 This script lets you use simple mouse gestures while holding a specific mouse button:
 Mouse buttons: 1=M1,2=M2,3=MMB,4=X1,5=X2. For G-buttons use their respective numbers eg. G9 is 9
 note, most main mouse buttons do not seem to be passed with EnablePrimaryMouseEvents(true) even if mapped to G keys
@@ -19,10 +19,10 @@ setmetatable(handlers,{__index = function(t,k)
     -- this __newindex method checks on direction assignment that it's valid and warns if it is not
     setmetatable(new, {__newindex = function(t,k,v)
       rawset(t,k,v) -- set the direction regardless, bypassing the this metamethod
-      if ({left=1,right=1,up=1,down=1,center=1,fake=1})[k] ~= 1 then
+      if ({left=1,right=1,up=1,down=1,center=1,fake=1})[k] ~= 1 then -- allow fake to add button without warning
         OutputLogMessage("'%s' is an invalid direction for button %d at line %d!\n", k, t.button, debug.getinfo(2,'l').currentline)
         OutputLogMessage("If generating buttons %d will still be added to the list for base usage.\n", t.button)
-      end
+      end    
     end})
     t[k] = new
     return t[k]
@@ -36,6 +36,9 @@ end})
 -- Eg. if something is mapped to press E holding that key to gesture _will_ type E
 -- if not provided then will be generated based on the declared handlers below
 --buttons = {3, 7, 11, 14} -- if commented out then generates buttons based on specified handlers
+gshift_buttons = {6} -- ignore buttons if one of these is being held, so that you can still use gshifted keys as separately
+-- TODO enable buttons only _if_ gshifted?
+-- would require buttons value be {key,{accepted gshift keys list},...} or something? or maybe negative if there's only one gshift?
 
 thresholds = {
   ["x"]    = 5000, -- Change thresholds for x and y to set
@@ -58,15 +61,20 @@ handlers.right      = function() PressAndReleaseKeyModified("t","lctrl","lshift"
 
 handlers[3].center  = function() PressAndReleaseKeyModified("tab","lalt") end          -- alt+tab
 
-handlers[11].left   = function() PressAndReleaseKeyModified("F4","lalt") end           -- alt-F4 close window
-handlers[11].down   = function() gestureReset() end           -- alt-F4 close window
+handlers[11].up     = function() PressAndReleaseKey("f5") end                          -- browser refresh page
+handlers[11].down   = function() gestureReset() end                                    -- restore maximized window size/ps
+--handlers[11].left   = function() PressAndReleaseKeyModified("F4","lalt") end           -- placeholder
+--handlers[11].right  = function() PressAndReleaseKeyModified("delete","lctrl") end      -- placeholder
 
 handlers[14].up     = function() gestureMaximise() end
 handlers[14].down   = function() gestureMinimise() end
-handlers[14].left   = function() PressAndReleaseKeyModified("F4","lalt") end
-handlers[14].right  = function() PressAndReleaseKeyModified("delete","lctrl") end -- QuiteRSS delte all
+handlers[14].left   = function() PressAndReleaseKeyModified("F4","lalt") end           -- duplicate alt-f4
+handlers[14].right  = function() PressAndReleaseKeyModified("delete","lctrl") end      -- QuiteRSS delete all
 
-handlers[7].fake = 1 -- allows a button to be generated without any specific directions and only works for base directions
+handlers[7].left    = function() PressAndReleaseKeyModified("3", "lshift") end         -- email client, delete email
+handlers[7].center  = function() PressAndReleaseKeyModified("tab", "lctrl", "lalt", "tab")  end
+
+--handlers[99].fake = 1 -- allows a button to be generated without any specific directions and only works for base directions
 
 -- //////////////////////////////// END OF CONFIG //////////////////////////////// 
 
@@ -82,7 +90,6 @@ handlers[7].fake = 1 -- allows a button to be generated without any specific dir
 local old_buttons = buttons
 buttons = {}
 if old_buttons then
-  generate_buttons = false
   -- quick loop to transform readable {1,2,3} to {[1]=1, [2]=1, [3]=1} where 1 is not nil
   -- so that users can easily create list of special keys and lookup can be just buttons[arg]
   for _,key in ipairs(old_buttons) do buttons[key] = 1 end
@@ -93,10 +100,10 @@ for button,_ in pairs(handlers) do
   if type(button) == "number" then
     num_buttons = num_buttons + 1
     if button < 1 or button > 32 then OutputLogMessage("UM... did you mean to declare a handler for button %d??\n", button)end
-    if not old_buttons then buttons[button] = 1
-    elseif not buttons[button] then OutputLogMessage("Handler declared for undeclared button %d!\n", button); num_buttons = num_buttons - 1 end
-  elseif type(button) == "string" then 
-    if ({left=1,right=1,up=1,down=1,center=1,do_base=1})[button] ~= 1 then OutputLogMessage("%s is an invalid direction!\n", button) end
+    if not old_buttons then buttons[button] = {}
+  elseif not buttons[button] then OutputLogMessage("Handler declared for undeclared button %d!\n", button); num_buttons = num_buttons - 1 end
+elseif type(button) == "string" then 
+  if ({left=1,right=1,up=1,down=1,center=1,do_base=1})[button] ~= 1 then OutputLogMessage("%s is an invalid direction!\n", button) end
   else OutputLogMessage("Wtf kind of handler is a %s\n", type(button)) end -- should be caught by __index metamethod
 end
 
@@ -114,30 +121,39 @@ EnablePrimaryMouseButtonEvents(true)
 local function call(dir,arg)
   -- call specific handler if one is set, otherwise try to call base dir handler
   if handlers[arg][dir] then handled = true; handlers[arg][dir]()
-  elseif handlers.do_base and handlers[dir] then handlers[dir]() end
+elseif handlers.do_base and handlers[dir] then handlers[dir]() end
 end
+
+pressed = {} -- IsMouseButtonPressed doesn't seem to support Gkeys so... make my own 
 
 function OnEvent(event, arg, family)
   if event == "MOUSE_BUTTON_PRESSED" then
+    pressed[arg] = true -- IsMouseButtonPressed doesn't seem to support Gkeys so... make my own 
     -- work around for X1/X2 aka foward/back not working if assigned
     if arg == 11 then PressMouseButton(5) end
     if arg == 14 then PressMouseButton(4) end
     -- remember starting position if one of the meaningful keys
-    if buttons[arg] then buttons[arg] = {["start"]=vector.new(GetMousePosition()),["time"]=GetRunningTime()} end
+    local gshifted = false
+    for _,gshift in ipairs(gshift_buttons) do if pressed[gshift] then gshifted = true break end end
+    if not gshifted and buttons[arg] then buttons[arg] = {["start"]=vector.new(GetMousePosition()),["time"]=GetRunningTime()} end
   end
 
   if event == "MOUSE_BUTTON_RELEASED" then
+    pressed[arg] = nil -- IsMouseButtonPressed doesn't seem to support Gkeys so... make my own 
     -- work around for X1/X2 aka foward/back not working if assigned
     if arg == 11 then ReleaseMouseButton(5) end
     if arg == 14 then ReleaseMouseButton(4) end
 
     -- time to work :)
-    if buttons[arg] then
+    if buttons[arg] and buttons[arg].start then
       local stop = vector.new(GetMousePosition())
       local diff = stop-buttons[arg].start
+      buttons[arg].start = nil -- disable until next valid press 
       local time_diff = GetRunningTime() - buttons[arg].time
-      if time_diff < thresholds.time then
-        PressAndReleaseMouseButton(2)
+      if time_diff < thresholds.time and arg == 3 then
+        PressAndReleaseMouseButton(2) -- press my middle mouse button if it's under the threshold
+        -- for some reason it has never worked properly in software mode when assigned
+        -- though it does in the onboard profile and other Gkeys /shrug. LGS is a kludge of semi-useful code apparently
         return
       end
 
@@ -147,7 +163,7 @@ function OnEvent(event, arg, family)
       -- and if you happen to get a perfect straight line, a completely separate 8
       -- test image https://etc.usf.edu/clipart/43200/43202/unit-circle10_43202_lg.gif
       -- I wish there was a way to draw an overlay when the button was held, particularly if it could be highlighted
-      -- like those circular weapon selections in games... I don"t really see anything in the logitech api for that though lol
+      -- like those circular weapon selections in games... I don't really see anything in the logitech api for that though lol
 
       dir = math.deg(math.atan2(diff.y,diff.x)) + 180 -- original 0=right, 90=down, 179=left, -90=up!
       --                                                  +180 shifts to left is 0/360, up 90 etc.
@@ -160,9 +176,9 @@ function OnEvent(event, arg, family)
       elseif diff.y < -thresholds.y then call("up",arg)
       elseif diff.y >  thresholds.y then call("down",arg)
       elseif diff.x < -thresholds.x then call("left",arg)
-      elseif diff.x >  thresholds.x then call("right",arg) end
-    end
+    elseif diff.x >  thresholds.x then call("right",arg) end
   end
+end
 end
 
 -- Helper functions
