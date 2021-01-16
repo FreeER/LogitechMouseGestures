@@ -1,7 +1,7 @@
 --[[
 Author:    Mat/FreeER
-Version:   1.15
-Date:      Jan. 8th 2021
+Version:   1.15.1
+Date:      Jan. 15th 2021
 This script lets you use simple mouse gestures while holding a specific mouse button:
 Mouse buttons: 1=M1,2=M2,3=MMB,4=X1,5=X2. For G-buttons use their respective numbers eg. G9 is 9
 note, most main mouse buttons do not seem to be passed with EnablePrimaryMouseEvents(true) even if mapped to G keys
@@ -40,6 +40,12 @@ gshift_buttons = {6} -- ignore buttons if one of these is being held, so that yo
 -- TODO enable buttons only _if_ gshifted?
 -- would require buttons value be {key,{accepted gshift keys list},...} or something? or maybe negative if there's only one gshift?
 
+escapeModifier = "lctrl" -- hold this key when releasing gesture and nothing will happen
+-- TODO allow alternate gestures with different modifiers?
+
+-- also, mini-rant: Why TF does logitech not allow me to be notified, or even _check_, regular keyboard keys?
+-- originally wanted to get an event for pressing Escape and have that cancel the gesture.
+
 thresholds = {
   ["x"]    = 5000, -- Change thresholds for x and y to set
   ["y"]    = 8000, -- the min distance needed for a gesture
@@ -56,23 +62,25 @@ handlers.up         = function() PressAndReleaseKey("home") end
 handlers.down       = function() PressAndReleaseKey("end")  end
 -- PressAndReleaseKeyModified presses the first key last, assuming any other keys are modifiers that should be held first and released after
 -- note: for whatever reason Press...Key doesn't seem to like "ctrl", it wants "lctrl" or presumably "rctrl"
-handlers.left       = function() PressAndReleaseKeyModified("w","lctrl") end           -- browser close tab
-handlers.right      = function() PressAndReleaseKeyModified("t","lctrl","lshift") end  -- browser reopen tab
+handlers.left       = function() PressAndReleaseKeyModified("w","lctrl") end             -- browser close tab
+handlers.right      = function() PressAndReleaseKeyModified("t","lctrl","lshift") end    -- browser reopen tab
 
-handlers[3].center  = function() PressAndReleaseKeyModified("tab","lalt") end          -- alt+tab
+handlers[3].center  = function() PressAndReleaseKeyModified("tab","lalt") end            -- alt+tab
 
-handlers[11].up     = function() PressAndReleaseKey("f5") end                          -- browser refresh page
-handlers[11].down   = function() gestureReset() end                                    -- restore maximized window size/ps
+handlers[11].up     = function() PressAndReleaseKey("f5") end                            -- browser refresh page
+handlers[11].down   = function() gestureReset() end                                      -- restore maximized window size/ps
 --handlers[11].left   = function() PressAndReleaseKeyModified("F4","lalt") end           -- placeholder
 --handlers[11].right  = function() PressAndReleaseKeyModified("delete","lctrl") end      -- placeholder
 
 handlers[14].up     = function() gestureMaximise() end
 handlers[14].down   = function() gestureMinimise() end
-handlers[14].left   = function() PressAndReleaseKeyModified("F4","lalt") end           -- duplicate alt-f4
-handlers[14].right  = function() PressAndReleaseKeyModified("delete","lctrl") end      -- QuiteRSS delete all
+handlers[14].left   = function() PressAndReleaseKeyModified("F4","lalt") end             -- duplicate alt-f4
+handlers[14].right  = function() PressAndReleaseKeyModified("delete","lctrl") end        -- QuiteRSS delete all
 
-handlers[7].left    = function() PressAndReleaseKeyModified("3", "lshift") end         -- email client, delete email
-handlers[7].center  = function() PressAndReleaseKeyModified("tab", "lctrl", "lalt", "tab")  end
+handlers[7].left    = function() PressAndReleaseKeyModified("3", "lshift") end           -- email client, delete email
+handlers[7].right   = function() PressAndReleaseKeyModified("1", "lshift") end           -- email client, junk   email
+handlers[7].center  = function() PressAndReleaseKeyModified("tab", "lctrl", "lalt")  end -- alt+tab, stays open
+handlers[7].down    = function() PressAndReleaseKey("f5") end                            -- browser refresh page
 
 --handlers[99].fake = 1 -- allows a button to be generated without any specific directions and only works for base directions
 
@@ -101,8 +109,8 @@ for button,_ in pairs(handlers) do
     num_buttons = num_buttons + 1
     if button < 1 or button > 32 then OutputLogMessage("UM... did you mean to declare a handler for button %d??\n", button)end
     if not old_buttons then buttons[button] = {}
-  elseif not buttons[button] then OutputLogMessage("Handler declared for undeclared button %d!\n", button); num_buttons = num_buttons - 1 end
-elseif type(button) == "string" then 
+    elseif not buttons[button] then OutputLogMessage("Handler declared for undeclared button %d!\n", button); num_buttons = num_buttons - 1 end
+    elseif type(button) == "string" then 
   if ({left=1,right=1,up=1,down=1,center=1,do_base=1})[button] ~= 1 then OutputLogMessage("%s is an invalid direction!\n", button) end
   else OutputLogMessage("Wtf kind of handler is a %s\n", type(button)) end -- should be caught by __index metamethod
 end
@@ -121,7 +129,7 @@ EnablePrimaryMouseButtonEvents(true)
 local function call(dir,arg)
   -- call specific handler if one is set, otherwise try to call base dir handler
   if handlers[arg][dir] then handled = true; handlers[arg][dir]()
-elseif handlers.do_base and handlers[dir] then handlers[dir]() end
+  elseif handlers.do_base and handlers[dir] then handlers[dir]() end
 end
 
 pressed = {} -- IsMouseButtonPressed doesn't seem to support Gkeys so... make my own 
@@ -145,7 +153,7 @@ function OnEvent(event, arg, family)
     if arg == 14 then ReleaseMouseButton(4) end
 
     -- time to work :)
-    if buttons[arg] and buttons[arg].start then
+    if buttons[arg] and buttons[arg].start and not IsModifierPressed(escapeModifier) then
       local stop = vector.new(GetMousePosition())
       local diff = stop-buttons[arg].start
       buttons[arg].start = nil -- disable until next valid press 
@@ -176,7 +184,7 @@ function OnEvent(event, arg, family)
       elseif diff.y < -thresholds.y then call("up",arg)
       elseif diff.y >  thresholds.y then call("down",arg)
       elseif diff.x < -thresholds.x then call("left",arg)
-    elseif diff.x >  thresholds.x then call("right",arg) end
+      elseif diff.x >  thresholds.x then call("right",arg) end
   end
 end
 end
